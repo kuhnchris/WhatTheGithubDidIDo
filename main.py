@@ -73,8 +73,9 @@ query ($endCursor: String){
 }
 '''
 
+myIssues = []
 
-def read_github_via_graphql(ep, cursor=""):
+def read_github_via_graphql(ep, arr=[], cursor=""):
     client = GraphQLClient(ep)
     clientVar = {}
     if cursor:
@@ -85,17 +86,33 @@ def read_github_via_graphql(ep, cursor=""):
     result = client.execute(mqQuery, clientVar)
     f = json.loads(result)
     for obj in f["data"]["viewer"]["issues"]["edges"]:
-        ctx = obj["node"]
-        status = f"{colors.fg.red}open   X"
-        if ctx["closed"]:
-            status = f"{colors.fg.green}closed ✓"
-        repo = f'{ctx["repository"]["owner"]["login"]}/{ctx["repository"]["name"]}'
-        print(f"{status} | {repo.rjust(40)} | {str(ctx['number']).rjust(5)} | {ctx['title']} | {ctx['url']}{colors.reset}")
+        arr.append(obj['node'])
 
     page_ctx = f["data"]["viewer"]["issues"]["pageInfo"]
     if page_ctx['hasNextPage']:
         next_cursor = page_ctx['endCursor']
-        read_github_via_graphql(ep, next_cursor)
+        read_github_via_graphql(ep, arr, next_cursor)
 
 
-read_github_via_graphql('https://api.github.com/graphql')
+def printMyIssues(arr):
+    maxLenRep = 0
+    maxLenUrl = 0
+    # figure out max length
+    for obj in arr:
+        repo = f'{obj["repository"]["owner"]["login"]}/{obj["repository"]["name"]}'
+        if len(obj['url']) > maxLenUrl:
+            maxLenUrl = len(obj['url'])
+        if len(repo) > maxLenRep:
+            maxLenRep = len(repo)
+
+    for obj in arr:
+        ctx = obj
+        status = f"{colors.fg.red}open   X"
+        if ctx["closed"]:
+            status = f"{colors.fg.green}closed ✓"
+        repo = f'{ctx["repository"]["owner"]["login"]}/{ctx["repository"]["name"]}'
+        print(f"{status} | {repo.rjust(maxLenRep)} | {str(ctx['number']).rjust(5)} | {ctx['url'].ljust(maxLenUrl)} | {ctx['title']}{colors.reset}")
+
+
+read_github_via_graphql('https://api.github.com/graphql', myIssues)
+printMyIssues(myIssues)
